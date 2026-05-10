@@ -7,7 +7,7 @@ from openai import OpenAI
 client = OpenAI()
 
 AUDIO_FILE = 'command.wav'
-SAMPLE_RATE = 16000
+SAMPLE_RATE = 48000
 RECORD_SECONDS = 5
 
 
