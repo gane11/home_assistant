@@ -1,28 +1,73 @@
 import subprocess
 
+import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from openai import OpenAI
+from openwakeword.model import Model
 
 client = OpenAI()
 
 AUDIO_FILE = 'command.wav'
-SAMPLE_RATE = 48000
+
+DEVICE_SAMPLE_RATE = 48000  # use the value that works for your speakerphone
+WAKE_SAMPLE_RATE = 16000
 RECORD_SECONDS = 5
+WAKE_THRESHOLD = 0.5
+
+wake_model = Model(wakeword_models=['hey_buddy'])
+
+
+def resample_to_16k(audio_chunk):
+    audio_chunk = np.squeeze(audio_chunk).astype(np.float32)
+
+    original_length = len(audio_chunk)
+    target_length = int(original_length * WAKE_SAMPLE_RATE / DEVICE_SAMPLE_RATE)
+
+    original_indexes = np.linspace(0, original_length - 1, original_length)
+    target_indexes = np.linspace(0, original_length - 1, target_length)
+
+    resampled = np.interp(target_indexes, original_indexes, audio_chunk)
+
+    return resampled.astype(np.int16)
+
+
+def wait_for_wake_word():
+    print('Listening for wake word: hey jarvis')
+
+    chunk_size = int(DEVICE_SAMPLE_RATE * 0.08)
+
+    with sd.InputStream(
+        channels=1,
+        samplerate=DEVICE_SAMPLE_RATE,
+        dtype='int16',
+        blocksize=chunk_size,
+    ) as stream:
+        while True:
+            audio_chunk, _ = stream.read(chunk_size)
+            wake_audio = resample_to_16k(audio_chunk)
+
+            prediction = wake_model.predict(wake_audio)
+            score = prediction.get('hey_jarvis', 0)
+
+            if score > WAKE_THRESHOLD:
+                print('Wake word detected')
+                subprocess.run(['espeak', 'yes'])
+                return
 
 
 def record_audio(seconds=RECORD_SECONDS):
-    print('Listening...')
+    print('Listening for command...')
 
     audio = sd.rec(
-        int(seconds * SAMPLE_RATE),
-        samplerate=SAMPLE_RATE,
+        int(seconds * DEVICE_SAMPLE_RATE),
+        samplerate=DEVICE_SAMPLE_RATE,
         channels=1,
         dtype='int16',
     )
 
     sd.wait()
-    sf.write(AUDIO_FILE, audio, SAMPLE_RATE)
+    sf.write(AUDIO_FILE, audio, DEVICE_SAMPLE_RATE)
 
     print('Done recording.')
 
@@ -51,7 +96,7 @@ def speak(text):
 
 
 while True:
-    input('Press Enter, then ask your question...')
+    wait_for_wake_word()
 
     record_audio()
 

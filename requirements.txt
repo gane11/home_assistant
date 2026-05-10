@@ -1,3 +1,5 @@
 openai
 sounddevice
 soundfile
+openwakeword
+numpy
