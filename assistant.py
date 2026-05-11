@@ -10,12 +10,13 @@ client = OpenAI()
 
 AUDIO_FILE = 'command.wav'
 
-DEVICE_SAMPLE_RATE = 48000  # use the value that works for your speakerphone
+DEVICE_SAMPLE_RATE = 48000  # keep this if 48000 worked for your speakerphone
 WAKE_SAMPLE_RATE = 16000
 RECORD_SECONDS = 5
 WAKE_THRESHOLD = 0.5
 
-wake_model = Model(wakeword_models=['hey_buddy'])
+wake_model = Model()
+print(wake_model.models.keys())
 
 
 def resample_to_16k(audio_chunk):
@@ -33,7 +34,7 @@ def resample_to_16k(audio_chunk):
 
 
 def wait_for_wake_word():
-    print('Listening for wake word: hey jarvis')
+    print('Listening for wake word...')
 
     chunk_size = int(DEVICE_SAMPLE_RATE * 0.08)
 
@@ -48,10 +49,18 @@ def wait_for_wake_word():
             wake_audio = resample_to_16k(audio_chunk)
 
             prediction = wake_model.predict(wake_audio)
-            score = prediction.get('hey_jarvis', 0)
 
-            if score > WAKE_THRESHOLD:
-                print('Wake word detected')
+            if not prediction:
+                continue
+
+            best_wake_word = max(prediction, key=prediction.get)
+            best_score = prediction[best_wake_word]
+
+            if best_score > 0.1:
+                print(f'{best_wake_word}: {best_score:.2f}')
+
+            if best_score > WAKE_THRESHOLD:
+                print(f'Wake word detected: {best_wake_word}')
                 subprocess.run(['espeak', 'yes'])
                 return
 
