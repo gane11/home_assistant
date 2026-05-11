@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 import numpy as np
 import sounddevice as sd
@@ -61,7 +62,6 @@ def wait_for_wake_word():
 
             if best_score > WAKE_THRESHOLD:
                 print(f'Wake word detected: {best_wake_word}')
-                subprocess.run(['espeak', 'yes'])
                 return
 
 
@@ -104,15 +104,29 @@ def speak(text):
     subprocess.run(['espeak', text])
 
 
-while True:
-    wait_for_wake_word()
+try:
+    while True:
+        wait_for_wake_word()
 
-    record_audio()
+        record_audio()
 
-    text = transcribe_audio()
-    print('You:', text)
+        text = transcribe_audio()
+        print('You:', text)
 
-    answer = ask_llm(text)
-    print('Assistant:', answer)
+        if not text.strip():
+            print('No speech detected.')
+            time.sleep(1)
+            continue
 
-    speak(answer)
+        answer = ask_llm(text)
+        print('Assistant:', answer)
+
+        speak(answer)
+
+        if hasattr(wake_model, 'reset'):
+            wake_model.reset()
+
+        time.sleep(2)
+
+except KeyboardInterrupt:
+    print('\nShutting down.')
